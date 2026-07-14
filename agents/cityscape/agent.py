@@ -22,8 +22,8 @@ get_weather = McpToolset(
 nano_banana = McpToolset(
     connection_params=StdioConnectionParams(
         server_params=StdioServerParameters(
-            command="/usr/local/gcp/bin/sandbox" if os.path.exists("/usr/local/gcp/bin/sandbox") else "mcp-gemini-go",
-            args=["do", "--", "mcp-gemini-go"] if os.path.exists("/usr/local/gcp/bin/sandbox") else [],
+            command="mcp-gemini-go",
+            args=[],
             env=dict(os.environ, PROJECT_ID=os.environ.get("GOOGLE_CLOUD_PROJECT", "")),
         ),
         timeout=60,
@@ -77,14 +77,21 @@ def get_time_for_city(city: str) -> str:
     script_path = os.path.join(os.getcwd(), "get_time.py")
     
     if os.path.exists(sandbox_path):
-        cmd = [sandbox_path, "do", "--", "python", script_path, city]
+        import sys
+        import os
+        print(f"Executing time script inside Cloud Run sandbox for city: {city}")
+        cmd = [sandbox_path, "do", "--env", f"MAPS_API_KEY={os.environ.get('MAPS_API_KEY', '')}", "--", sys.executable, script_path, city]
     else:
-        cmd = ["python", script_path, city]
+        import sys
+        print(f"Executing time script locally (no sandbox) for city: {city}")
+        cmd = [sys.executable, script_path, city]
         
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        print(f"Execution successful. Time retrieved: {result.stdout.strip()}")
         return result.stdout.strip()
     except subprocess.CalledProcessError as e:
+        print(f"Execution failed. Error: {e.stderr}")
         return f"Error getting time: {e.stderr}"
 
 
