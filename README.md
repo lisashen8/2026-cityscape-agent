@@ -129,19 +129,33 @@ gcloud secrets add-iam-policy-binding maps-api-key \
 
 ### Deploy Service
 
-Because the Cloud Run execution sandbox is currently in early preview, it cannot be fully configured using the standard `gcloud run deploy` command. Instead, you must deploy the service and then manually patch the underlying Cloud Run API to set `sandboxLauncher: true` and `launchStage: BETA`. 
-
-We have provided a deployment script (`redeploy_and_patch.sh`) and a python patch script (`patch_sandbox.py`) that handle this entire process automatically.
-
-Make sure to edit the `redeploy_and_patch.sh` and `patch_sandbox.py` files to match your `$PROJECT_ID` and region before running it!
+First, deploy the application using the standard `gcloud run deploy` command:
 
 ```sh
-bash redeploy_and_patch.sh
+CLOUD_RUN_REGION=europe-west1
+
+gcloud run deploy cityscape-agent \
+--source . \
+--region $CLOUD_RUN_REGION \
+--project $PROJECT_ID \
+--no-allow-unauthenticated \
+--service-account="${SERVICE_ACCOUNT_NAME}@${PROJECT_ID}.iam.gserviceaccount.com" \
+--set-env-vars="GOOGLE_CLOUD_PROJECT=$PROJECT_ID,GOOGLE_CLOUD_LOCATION=global,GOOGLE_GENAI_USE_VERTEXAI=true,SERVE_WEB_INTERFACE=true" \
+--set-secrets="MAPS_API_KEY=maps-api-key:latest"
 ```
 
-> **Note on Cloud Run Sandbox execution:** This application requires the Cloud Run execution sandbox to securely run the `get_time.py` script dynamically. The patch script uses your local gcloud authentication token to modify the Cloud Run v2 REST API to enable the sandbox. Because `gcloud run deploy` overwrites IAM bindings for unauthenticated access, the bash script also automatically re-applies the `roles/run.invoker` permission for `allUsers`.
+> **Note on Cloud Run Sandbox execution:** This application requires the Cloud Run execution sandbox to securely run the `get_time.py` script dynamically. Since this feature is in early preview, it must be explicitly enabled using the `gcloud beta` CLI after your initial deployment.
 
-To access it for testing purposes, visit the URL output by the deployment script, or create a [Cloud Run IAP](https://docs.cloud.google.com/run/docs/securing/identity-aware-proxy-cloud-run).
+Enable the sandbox by running the following command:
+
+```sh
+gcloud beta run services update cityscape-agent \
+  --sandbox-launcher \
+  --region $CLOUD_RUN_REGION \
+  --project $PROJECT_ID
+```
+
+To access it for testing purposes, create a [Cloud Run IAP](https://docs.cloud.google.com/run/docs/securing/identity-aware-proxy-cloud-run) or use the [Cloud Run auth proxy](https://docs.cloud.google.com/sdk/gcloud/reference/run/services/proxy).
 
 ## Screenshot
 
