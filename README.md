@@ -1,7 +1,7 @@
 # Cityscape ADK agent deployed to Cloud Run
 # Cloud Run feature highlights: sandbox and MCP servers
 
-This repository contains an example agent built with the Application Development Kit (ADK). The agent, `cityscape`, demonstrates how to integrate with various services to generate cityscape images based on user prompts. It uses the Google Maps Grounding Lite MCP Server for location information and the Nano Banana (via GenMedia MCP Server) model for image generation.
+This repository contains an example agent built with the Application Development Kit (ADK). The agent, `cityscape`, demonstrates how to integrate with various services to generate cityscape images based on user prompts. It uses the Google Maps Grounding Lite MCP Server for location information and the Nano Banana (via GenMedia MCP Server) model for image generation. It leverages Cloud Run nested Sandbox feature to run a local python scrpt to get the current time of the city and display it in the image along with the weather info. 
 
 ## Activate GCP Services
 
