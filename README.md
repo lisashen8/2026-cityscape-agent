@@ -142,6 +142,8 @@ gcloud run deploy cityscape-agent \
 --set-secrets="MAPS_API_KEY=maps-api-key:latest"
 ```
 
+> **Note on Cloud Run Sandbox execution:** This application requires the Cloud Run execution sandbox to securely run the `get_time.py` script dynamically. Since this feature is in early preview, it currently must be toggled on manually using the Cloud Run API by updating `sandboxLauncher: true` and `launchStage: BETA` on your deployed service.
+
 To access it for testing purposes, create a [Cloud Run IAP](https://docs.cloud.google.com/run/docs/securing/identity-aware-proxy-cloud-run) or use the [Cloud Run auth proxy](https://docs.cloud.google.com/sdk/gcloud/reference/run/services/proxy).
 
 ## Screenshot
