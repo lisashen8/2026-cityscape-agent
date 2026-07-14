@@ -1,4 +1,4 @@
-# ADK Example - Cityscape
+# ADK agent Cityscape deployed to Cloud Run (cloud run nested sandbox and MCP servers)
 
 This repository contains an example agent built with the Application Development Kit (ADK). The agent, `cityscape`, demonstrates how to integrate with various services to generate cityscape images based on user prompts. It uses the Google Maps Grounding Lite MCP Server for location information and the Nano Banana (via GenMedia MCP Server) model for image generation.
 
@@ -134,7 +134,7 @@ First, deploy the application using the standard `gcloud run deploy` command:
 ```sh
 CLOUD_RUN_REGION=europe-west1
 
-gcloud run deploy cityscape-agent \
+gcloud run deploy cityscape-agent2-sandbox \
 --source . \
 --region $CLOUD_RUN_REGION \
 --project $PROJECT_ID \
@@ -149,7 +149,9 @@ gcloud run deploy cityscape-agent \
 Enable the sandbox by running the following command:
 
 ```sh
-gcloud beta run services update cityscape-agent \
+gcloud components update
+
+gcloud beta run services update cityscape-agent2-sandbox \
   --sandbox-launcher \
   --region $CLOUD_RUN_REGION \
   --project $PROJECT_ID
