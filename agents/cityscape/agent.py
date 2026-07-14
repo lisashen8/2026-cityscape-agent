@@ -99,7 +99,7 @@ city_current_time = LlmAgent(
     model=DEFAULT_MODEL,
     name='city_current_time',
     description="Looks up the current time in the city.",
-    instruction="Use the available tool to get the current local time in the city to provide the image with up to date information.",
+    instruction="Use the available tool to get the current local time in the city to provide the image with up to date information. CRITICAL: You MUST use the exact time returned by the get_time_for_city tool. Do NOT guess or hallucinate the time. If the tool returns an error, output the exact error message.",
     tools=[get_time_for_city],
     output_key="city_time"
 )
