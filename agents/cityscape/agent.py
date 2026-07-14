@@ -123,11 +123,12 @@ city_drawer = LlmAgent(
     Image Model: {NANO_BANANA_MODEL}
 
     Instructions:
-    1. Come up with an absolute file path for the cityscape of the current city 
-        and make sure it's added to the current folders 'generated' folder 
+    1. Come up with an absolute directory path for the cityscape of the current city 
+        and make sure it's added to the current folder's 'generated' folder 
         e.g. {os.getcwd()}/generated/zurich/ for a cityscape of Zurich.
-    2. Use the `nano_banana` tool with the specified image model to create the image
-        in the above path by following these instructions carefully: 
+    2. Use the `nano_banana` tool with the specified image model to create the image.
+        CRITICAL: You MUST pass the directory path from step 1 as the `output_directory` argument!
+        Follow these instructions carefully for the image prompt:
         
         Present a clear, 45° top-down isometric miniature 3D cartoon scene of [CITY], 
         featuring its most iconic landmarks and architectural elements. Use soft, 
