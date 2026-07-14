@@ -1,4 +1,4 @@
-FROM golang:1.25 AS genmedia-mcp-builder
+FROM golang:1.26 AS genmedia-mcp-builder
 
 WORKDIR /app
 
