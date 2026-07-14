@@ -22,8 +22,9 @@ get_weather = McpToolset(
 nano_banana = McpToolset(
     connection_params=StdioConnectionParams(
         server_params=StdioServerParameters(
-            command="mcp-gemini-go",
-            env=dict(os.environ, PROJECT_ID=os.environ["GOOGLE_CLOUD_PROJECT"]),
+            command="/usr/local/gcp/bin/sandbox" if os.path.exists("/usr/local/gcp/bin/sandbox") else "mcp-gemini-go",
+            args=["do", "--", "mcp-gemini-go"] if os.path.exists("/usr/local/gcp/bin/sandbox") else [],
+            env=dict(os.environ, PROJECT_ID=os.environ.get("GOOGLE_CLOUD_PROJECT", "")),
         ),
         timeout=60,
     ),
@@ -67,9 +68,38 @@ city_current_weather = LlmAgent(
     output_key="city_weather"
 )
 
+def get_time_for_city(city: str) -> str:
+    """Gets the current local time for a given city."""
+    import subprocess
+    import os
+    
+    sandbox_path = "/usr/local/gcp/bin/sandbox"
+    script_path = os.path.join(os.getcwd(), "get_time.py")
+    
+    if os.path.exists(sandbox_path):
+        cmd = [sandbox_path, "do", "--", "python", script_path, city]
+    else:
+        cmd = ["python", script_path, city]
+        
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        return result.stdout.strip()
+    except subprocess.CalledProcessError as e:
+        return f"Error getting time: {e.stderr}"
+
+
+city_current_time = LlmAgent(
+    model=DEFAULT_MODEL,
+    name='city_current_time',
+    description="Looks up the current time in the city.",
+    instruction="Use the available tool to get the current local time in the city to provide the image with up to date information.",
+    tools=[get_time_for_city],
+    output_key="city_time"
+)
+
 city_info = ParallelAgent(
     name="city_info",
-    sub_agents=[city_profile, city_current_weather]
+    sub_agents=[city_profile, city_current_weather, city_current_time]
 )
 
 city_drawer = LlmAgent(
@@ -79,6 +109,7 @@ city_drawer = LlmAgent(
     instruction=f"""
     Image Context:
     - Current Date: {datetime.date.today().strftime("%A, %B %d, %Y")}
+    - Current Time in the City
     - Current Weather
     - Most Prominent Landmarks in that City
 
@@ -98,7 +129,7 @@ city_drawer = LlmAgent(
         into the city environment to create an immersive atmospheric mood.
         Use a clean, minimalistic composition with a soft, solid-colored background.
         At the top-center, place the title “[CITY]” in large bold text, a prominent
-        weather icon beneath it, then the current date and temperature (medium text).
+        weather icon beneath it, then the current date, time and temperature (medium text).
         All text must be centered with consistent spacing, and may subtly overlap the 
         tops of the buildings.
         Square 1080x1080 dimension.
