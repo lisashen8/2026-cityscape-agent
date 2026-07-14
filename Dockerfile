@@ -18,16 +18,14 @@ COPY requirements.txt .
 
 RUN pip install --no-cache-dir -r requirements.txt
 
-RUN adduser --disabled-password --gecos "" myuser
-
 COPY . .
 
 COPY --from=genmedia-mcp-builder /app/mcp-gemini-go /app/tools/mcp-gemini-go 
 
-RUN chown -R myuser:myuser /app
-
-USER myuser
-
-ENV PATH="/home/myuser/.local/bin:/app/tools:$PATH"
+# Note: We do NOT create or switch to a non-root user here. The container must 
+# run as root because the Cloud Run `sandbox do --allow-egress` command requires 
+# elevated privileges to create isolated network namespaces (/var/run/netns) 
+# to provide internet access to the sandboxed execution environment.
+ENV PATH="/root/.local/bin:/app/tools:$PATH"
 
 CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port $PORT"]

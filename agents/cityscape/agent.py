@@ -80,6 +80,10 @@ def get_time_for_city(city: str) -> str:
         import sys
         import os
         print(f"Executing time script inside Cloud Run sandbox for city: {city}")
+        # We must pass the --allow-egress flag to the sandbox binary so the 
+        # python script inside the sandbox can make outbound HTTP requests 
+        # to the Google Maps Geocoding and Timezone APIs. Without this flag, 
+        # the sandbox completely blocks all network access.
         cmd = [sandbox_path, "do", "--allow-egress", "--env", f"MAPS_API_KEY={os.environ.get('MAPS_API_KEY', '')}", "--", sys.executable, script_path, city]
     else:
         import sys

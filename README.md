@@ -20,17 +20,19 @@ The following MCP servers need to be prepared:
 See offical [documentation](https://developers.google.com/maps/ai/grounding-lite).
 
 ```sh
-gcloud beta services enable mapstools.googleapis.com --project=$PROJECT_ID
+gcloud beta services enable mapstools.googleapis.com geocoding-backend.googleapis.com timezone-backend.googleapis.com --project=$PROJECT_ID
 gcloud beta services mcp enable mapstools.googleapis.com --project=$PROJECT_ID
 ```
 
-Get a Maps API Key and limit it to `mapstools.googleapis.com`.
+Get a Maps API Key and limit it to `mapstools.googleapis.com`, `geocoding-backend.googleapis.com`, and `timezone-backend.googleapis.com`.
 
 ```sh
 gcloud services api-keys create \
     --display-name="Cityscape Maps MCP" \
     --key-id="cityscape-maps-mcp" \
     --api-target="service=mapstools.googleapis.com" \
+    --api-target="service=geocoding-backend.googleapis.com" \
+    --api-target="service=timezone-backend.googleapis.com" \
     --project $PROJECT_ID
 ```
 
