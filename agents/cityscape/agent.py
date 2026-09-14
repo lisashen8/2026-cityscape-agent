@@ -1,3 +1,9 @@
+"""
+Defines the multi-agent Cityscape workflow using the Agent Development Kit (ADK).
+It orchestrates landmark research, weather lookup via Google Maps MCP, and local time calculation in parallel.
+The gathered context is then passed to the Nano Banana (Gemini) image generation model to produce a stylized 3D cityscape.
+"""
+
 from google.adk.agents import LlmAgent, ParallelAgent, SequentialAgent
 from google.adk.tools.mcp_tool.mcp_toolset import McpToolset
 from google.adk.tools.mcp_tool.mcp_session_manager import StreamableHTTPConnectionParams, StdioConnectionParams
@@ -15,7 +21,7 @@ NANO_BANANA_MODEL='gemini-3-pro-image'
 get_weather = McpToolset(
     connection_params=StreamableHTTPConnectionParams(
         url="https://mapstools.googleapis.com/mcp",
-        headers={"X-Goog-Api-Key": os.environ["MAPS_API_KEY"] }
+        headers={"X-Goog-Api-Key": os.environ.get("MAPS_API_KEY", "").strip() }
     ),
 )
 
@@ -54,7 +60,7 @@ city_profile = LlmAgent(
     model=DEFAULT_MODEL,
     name='city_researcher',
     description="Find most iconic city attributes.",
-    instruction="Use the Google search tool to figure out the most iconic landmark and immediate geographical attributes (lakes, major rivers, hills etc.) in in a given city and return a ordered list starting with the most important landmarks.",
+    instruction="Use the Google search tool to figure out the most iconic landmark and immediate geographical attributes (lakes, major rivers, hills etc.) in a given city and return a ordered list starting with the most important landmarks.",
     tools=[google_search],
     output_key="city_profile"
 )

@@ -7,14 +7,34 @@ This repository contains a Cityscape agent built with the Agent Development Kit 
 2. **Cloud Run Nested Sandbox** securely executes a Python script to compute the city's current local time with network egress.
 3. **Nano Banana (Gemini image generation model)** synthesizes the live weather, local time, and iconic city landmarks into a stylized 3D cityscape image. You can also specify the theme of your cityscape image via the user prompt (e.g., *"Generate a cityscape of New York in Game of Thrones style"*).
 
-## Activate GCP Services
+## Prerequisites & Environment Setup
+
+Set your Google Cloud project ID variable so it can be used across the setup commands:
 
 ```sh
-gcloud services enable aiplatform.googleapis.com \
+export PROJECT_ID=$(gcloud config get-value project)
+```
+
+## Activate GCP Services
+
+Enable all required Google Cloud APIs (Vertex AI, Artifact Registry, Cloud Build, Cloud Run, Secret Manager, API Keys, IAM, and Google Maps backend services):
+
+```sh
+gcloud services enable \
+    aiplatform.googleapis.com \
     artifactregistry.googleapis.com \
     cloudbuild.googleapis.com \
-    run.googleapis.com --project $PROJECT_ID
+    run.googleapis.com \
+    secretmanager.googleapis.com \
+    apikeys.googleapis.com \
+    iam.googleapis.com \
+    mapstools.googleapis.com \
+    geocoding-backend.googleapis.com \
+    timezone-backend.googleapis.com \
+    --project $PROJECT_ID
 ```
+
+> **Note:** Separate MCP endpoint enablement (`gcloud beta services mcp enable`) is no longer required; enabling `mapstools.googleapis.com` via `gcloud services enable` automatically activates the Maps Grounding Lite MCP endpoint.
 
 ## MCP Servers
 
@@ -22,14 +42,9 @@ The following MCP servers need to be prepared:
 
 ### Google Maps Grounding Lite MCP Server
 
-See offical [documentation](https://developers.google.com/maps/ai/grounding-lite).
+See official [documentation](https://developers.google.com/maps/ai/grounding-lite).
 
-```sh
-gcloud beta services enable mapstools.googleapis.com geocoding-backend.googleapis.com timezone-backend.googleapis.com --project=$PROJECT_ID
-gcloud beta services mcp enable mapstools.googleapis.com --project=$PROJECT_ID
-```
-
-Get a Maps API Key and limit it to `mapstools.googleapis.com`, `geocoding-backend.googleapis.com`, and `timezone-backend.googleapis.com`.
+Create a Maps API Key and restrict it to `mapstools.googleapis.com`, `geocoding-backend.googleapis.com`, and `timezone-backend.googleapis.com`:
 
 ```sh
 gcloud services api-keys create \
@@ -41,7 +56,7 @@ gcloud services api-keys create \
     --project $PROJECT_ID
 ```
 
-Export it as a local variable for local development:
+Export it as an environment variable for local development:
 
 ```sh
 export MAPS_API_KEY="$(gcloud services api-keys get-key-string "cityscape-maps-mcp" --project $PROJECT_ID --format "value(keyString)")"
@@ -49,17 +64,30 @@ export MAPS_API_KEY="$(gcloud services api-keys get-key-string "cityscape-maps-m
 
 ### Nano Banana via GenMedia MCP Server
 
-See offical [documentation](https://github.com/GoogleCloudPlatform/vertex-ai-creative-studio/tree/main/experiments/mcp-genmedia) for how to install it for local development. 
-
-## Get Started
+See official [documentation](https://github.com/GoogleCloudPlatform/vertex-ai-creative-studio/tree/main/experiments/mcp-genmedia) for details on the GenMedia MCP server. For local development, install the `mcp-gemini-go` binary using Go and ensure your Go bin directory is in your `PATH`:
 
 ```sh
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt 
+go install github.com/GoogleCloudPlatform/vertex-ai-creative-studio/experiments/mcp-genmedia/mcp-genmedia-go/mcp-gemini-go@latest
+export PATH="$(go env GOPATH)/bin:$PATH"
 ```
 
+## Get Started (Local Development)
+
+Create a virtual environment and install dependencies:
+
 ```sh
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+Configure Vertex AI environment variables and launch the ADK web interface:
+
+```sh
+export GOOGLE_CLOUD_PROJECT=$PROJECT_ID
+export GOOGLE_CLOUD_LOCATION=global
+export GOOGLE_GENAI_USE_VERTEXAI=true
+
 adk web ./agents
 ```
 
@@ -73,10 +101,13 @@ Generate a cityscape for Zurich
 
 ### Build Permissions
 
-Ensure the default Compute Engine service account (used by Cloud Build for deployment) has permissions to access storage (for source code), write to Artifact Registry, and write logs.
+Ensure the default Compute Engine service account (used by Cloud Build for source deployments) has permissions to build and push containers (`roles/run.builder` or granular storage, Artifact Registry, and logging roles):
 
 ```sh
 PROJECT_NUMBER=$(gcloud projects describe $PROJECT_ID --format='value(projectNumber)')
+gcloud projects add-iam-policy-binding $PROJECT_ID \
+    --member="serviceAccount:${PROJECT_NUMBER}-compute@developer.gserviceaccount.com" \
+    --role="roles/run.builder"
 gcloud projects add-iam-policy-binding $PROJECT_ID \
     --member="serviceAccount:${PROJECT_NUMBER}-compute@developer.gserviceaccount.com" \
     --role="roles/storage.objectUser"
@@ -90,7 +121,7 @@ gcloud projects add-iam-policy-binding $PROJECT_ID \
 
 ### Create Service Account
 
-Create a dedicated service account for the application:
+Create a dedicated runtime service account for the Cloud Run application:
 
 ```sh
 SERVICE_ACCOUNT_NAME="cityscape-sa"
@@ -115,15 +146,16 @@ gcloud projects add-iam-policy-binding $PROJECT_ID \
 
 ### Setup Maps API Key Secret
 
-Create a secret for the Maps API Key in Secret Manager:
+Create a secret for the Maps API Key in Secret Manager (stripping any trailing newline from `gcloud` output before storing):
 
 ```sh
 gcloud secrets create maps-api-key --replication-policy="automatic" --project=$PROJECT_ID
 gcloud services api-keys get-key-string "cityscape-maps-mcp" --project $PROJECT_ID --format "value(keyString)" \
- | gcloud secrets versions add maps-api-key --data-file=- --project=$PROJECT_ID
+  | tr -d '\n' \
+  | gcloud secrets versions add maps-api-key --data-file=- --project=$PROJECT_ID
 ```
 
-Grant the service account access to the secret:
+Grant the runtime service account access to the secret:
 
 ```sh
 gcloud secrets add-iam-policy-binding maps-api-key \
@@ -134,35 +166,50 @@ gcloud secrets add-iam-policy-binding maps-api-key \
 
 ### Deploy Service
 
-First, deploy the application using the standard `gcloud run deploy` command:
+> **Note on Cloud Run Sandbox execution:** This application requires the Cloud Run execution sandbox (`--sandbox-launcher`) to securely run the `get_time.py` script dynamically with network egress. Because `--sandbox-launcher` is a preview feature, use `gcloud beta run deploy` to deploy and enable the sandbox in a single step.
 
-```sh
-CLOUD_RUN_REGION=europe-west1
-
-gcloud run deploy cityscape-agent2-sandbox \
---source . \
---region $CLOUD_RUN_REGION \
---project $PROJECT_ID \
---no-allow-unauthenticated \
---service-account="${SERVICE_ACCOUNT_NAME}@${PROJECT_ID}.iam.gserviceaccount.com" \
---set-env-vars="GOOGLE_CLOUD_PROJECT=$PROJECT_ID,GOOGLE_CLOUD_LOCATION=global,GOOGLE_GENAI_USE_VERTEXAI=true,SERVE_WEB_INTERFACE=true" \
---set-secrets="MAPS_API_KEY=maps-api-key:latest"
-```
-
-> **Note on Cloud Run Sandbox execution:** This application requires the Cloud Run execution sandbox to securely run the `get_time.py` script dynamically. Since this feature is in early preview, it must be explicitly enabled using the `gcloud beta` CLI after your initial deployment.
-
-Enable the sandbox by running the following command:
+Ensure your `gcloud` components are up to date and deploy the service:
 
 ```sh
 gcloud components update
 
-gcloud beta run services update cityscape-agent2-sandbox \
+CLOUD_RUN_REGION=europe-west1
+
+gcloud beta run deploy cityscape-agent-sandbox \
+  --source . \
+  --region $CLOUD_RUN_REGION \
+  --project $PROJECT_ID \
+  --allow-unauthenticated \
+  --sandbox-launcher \
+  --service-account="${SERVICE_ACCOUNT_NAME}@${PROJECT_ID}.iam.gserviceaccount.com" \
+  --set-env-vars="GOOGLE_CLOUD_PROJECT=$PROJECT_ID,GOOGLE_CLOUD_LOCATION=global,GOOGLE_GENAI_USE_VERTEXAI=true,SERVE_WEB_INTERFACE=true" \
+  --set-secrets="MAPS_API_KEY=maps-api-key:latest"
+```
+
+*(Optional)* If you deployed the service using standard `gcloud run deploy` without `--sandbox-launcher`, you can enable the sandbox on an existing service at any time by running:
+
+```sh
+gcloud beta run services update cityscape-agent-sandbox \
   --sandbox-launcher \
   --region $CLOUD_RUN_REGION \
   --project $PROJECT_ID
 ```
 
-To access it for testing purposes, create a [Cloud Run IAP](https://docs.cloud.google.com/run/docs/securing/identity-aware-proxy-cloud-run) or use the [Cloud Run auth proxy](https://docs.cloud.google.com/sdk/gcloud/reference/run/services/proxy).
+### Testing the Deployed Service
+
+1. **Quick testing (Public access):**
+   Because the deployment command above includes `--allow-unauthenticated`, you can open the **Service URL** printed in the deployment output directly in your browser to test the web interface immediately.
+
+2. **Strong security (Private access):**
+   For production or restricted environments, deploy (or update) the service using `--no-allow-unauthenticated` instead of `--allow-unauthenticated`. You can then securely access the service using either:
+   - **[Cloud Run auth proxy](https://cloud.google.com/sdk/gcloud/reference/run/services/proxy)** for local testing:
+     ```sh
+     gcloud run services proxy cityscape-agent-sandbox \
+       --region $CLOUD_RUN_REGION \
+       --project $PROJECT_ID
+     ```
+     Then open `http://localhost:8080` in your browser.
+   - **[Cloud Run Identity-Aware Proxy (IAP)](https://cloud.google.com/run/docs/securing/identity-aware-proxy-cloud-run)** for authenticated browser access.
 
 ## Screenshot
 

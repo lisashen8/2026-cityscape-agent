@@ -1,3 +1,9 @@
+"""
+Application entry point that initializes and configures the FastAPI web server using Google ADK.
+Exposes the agent endpoints, session management, and optional web interface or A2A communication.
+Runs via Uvicorn to serve incoming requests when deployed to Cloud Run.
+"""
+
 import os
 
 import uvicorn

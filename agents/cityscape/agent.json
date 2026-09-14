@@ -1,4 +1,5 @@
 {
+  "$comment": "A2A (Agent-to-Agent) metadata card for Cityscape agent. Declares protocols, capabilities, and skills for multi-agent discovery.",
   "capabilities": {},
   "defaultInputModes": [
     "text/plain"

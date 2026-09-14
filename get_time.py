@@ -1,11 +1,17 @@
+"""
+Retrieves the current local time for a specified city using Google Maps Geocoding and Timezone APIs.
+Designed to be executed within an isolated Cloud Run nested sandbox environment with network egress.
+Outputs the formatted 12-hour local time directly to stdout for consumption by the Cityscape agent.
+"""
+
 import sys
 import os
 import requests
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 
 def get_city_time(city):
-    api_key = os.environ.get("MAPS_API_KEY")
+    api_key = os.environ.get("MAPS_API_KEY", "").strip()
     if not api_key:
         print("Error: MAPS_API_KEY not set", file=sys.stderr)
         sys.exit(1)
@@ -32,7 +38,7 @@ def get_city_time(city):
     # The API returns dstOffset and rawOffset in seconds
     total_offset = tz_res.get('dstOffset', 0) + tz_res.get('rawOffset', 0)
     local_time = timestamp + total_offset
-    local_dt = datetime.utcfromtimestamp(local_time)
+    local_dt = datetime.fromtimestamp(local_time, timezone.utc)
     
     print(local_dt.strftime("%I:%M %p").lstrip("0"))
 
